@@ -1,0 +1,80 @@
+!pip install transformers torch gradio
+
+# Import the required components
+from transformers import BartTokenizer, BartForConditionalGeneration
+import gradio as gr
+
+
+
+
+# Colab Cell 2: Model Loading and Core Logic
+
+# 1. Load the pre-trained BART model and tokenizer
+# This model is a state-of-the-art Sequence-to-Sequence model for abstractive summarization.
+model_name = "facebook/bart-large-cnn"
+tokenizer = BartTokenizer.from_pretrained(model_name)
+model = BartForConditionalGeneration.from_pretrained(model_name)
+
+def generate_headline(article_text):
+    """
+    Core function to generate a headline using the BART model.
+    It takes the raw text and returns the generated headline.
+    """
+    # Guard against empty input
+    if not article_text or article_text.strip() == "":
+        return "Please paste a news article to generate a headline."
+
+    # 2. Tokenize the input article
+    # Truncation is set to True to handle articles longer than the model's limit (1024 tokens)
+    inputs = tokenizer(
+        [article_text],
+        max_length=1024,
+        truncation=True,
+        return_tensors="pt"
+    )
+
+    # 3. Generate the summary (headline) using beam search
+    summary_ids = model.generate(
+        inputs["input_ids"],
+        num_beams=4,          # Use 4 beams for better quality headlines
+        max_length=40,        # Headline max length
+        min_length=10,        # Headline min length
+        length_penalty=2.0,   # Encourages a slightly longer, more descriptive headline
+        early_stopping=True
+    )
+
+    # 4. Decode the generated IDs back into human-readable text
+    headline = tokenizer.decode(summary_ids.squeeze(), skip_special_tokens=True)
+    return headline
+
+
+# Colab Cell 3: Gradio User Interface
+
+# Define the user interface elements
+input_textbox = gr.Textbox(
+    lines=15,
+    label="Paste Your News Article Here",
+    placeholder="Start typing or paste a long news article to see the generated headline...",
+    interactive=True  # Ensure the user can type here
+)
+
+output_textbox = gr.Textbox(
+    label="Generated News Headline",
+    placeholder="The headline will appear here after clicking Submit.",
+    lines=2,
+    interactive=False # Output should not be editable by the user
+)
+
+# Create the Gradio Interface object
+interface = gr.Interface(
+    fn=generate_headline,
+    inputs=input_textbox,
+    outputs=output_textbox,
+    title="📰 Automatic News Headline Generator (AMLTA Project)",
+    description="This tool uses the BART Transformer Model for Abstractive Summarization.",
+    allow_flagging='never' # Optional: Removes the 'Flag' button
+)
+
+# Launch the UI
+# When you run this, a clickable link and the interface itself will appear in the Colab output.
+interface.launch(share=True)
